@@ -10,8 +10,8 @@ Sim-to-sim transfer serves as a crucial intermediate step, enabling us to evalua
 This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam form VISTEC. The objective is to analyze **sim-to-sim policy transfer mismatch** for learned legged locomotion policies under **contact-rich dynamics**, with focus on **transient responses induced by command switching**. A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **without retraining** to **MuJoCo (Sim B)**.
 
 <p align="center">
-    <img width=45% src="videos\play_isaacgym_1.gif">
-    <img width=41% src="videos\deploy_mujoco_1.gif">
+    <img width=45% src="sources\play_isaacgym_1.gif">
+    <img width=41% src="sources\deploy_mujoco_1.gif">
     </br> Played policy on Isaac Gym then deployed to Mujoco
 </p>
 
@@ -80,11 +80,9 @@ The objective is to analyze **sim-to-sim policy transfer mismatch** for learned 
 
 A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **without retraining** to **MuJoCo (Sim B)**.
 
-<gif src="~\videos\play_isaaclab.gif" width="320" height="240" controls></video>
-
 <p align="center">
-    <img width=45% src="videos\play_isaaclab.gif">
-    <img width=45% src="videos\play_isaacgym.gif">
+    <img width=45% src="sources\play_isaaclab.gif">
+    <img width=45% src="sources\play_isaacgym.gif">
     </br> Similarity in IsaacLab and Isaac Gym
 </p>
 
@@ -104,11 +102,32 @@ While we have verified that Isaac Lab can produce deployable policies with equiv
 
 ## Robot Platform
 
+<p align="center">
+    <img width=60% src="sources\Robots_Unitree_Go2.png">
+    </br> The Unitree Go2 is a quadrupedal mobile robot designed for a variety of applications including research, field operations, education, and industrial tasks.
+</p>
+
+
 - **Robot:** Unitree Go2 Quadruped
 - **DOF:** 12 (3 joints × 4 legs)
 - **Joint Order Isaac Gym:** FL, FR, RL, RR (hip, thigh, calf per leg)
 - **Joint Order MuJoCo qpos:** FL, FR, RL, RR (same as Isaac Gym)
 - **Actuator Order MuJoCo ctrl:** FR, FL, RR, RL (requires remapping)
+
+
+The Go2 uses **quasi-direct drive (QDD) actuators** with low gear ratio (~6-10:1), placing its dynamics complexity between platforms studied in prior sim-to-real work:
+
+| Paper | Robot | Actuator Type | Modeling Approach |
+|-------|-------|--------------|-------------------|
+| Tan et al. (2018) | Minitaur | Direct-drive (no gears) | Analytical model (T = Kt·I) |
+| Hwangbo et al. (2019) | ANYmal | Series-Elastic (SEA) | Learned ActuatorNet |
+| Peng et al. (2018) | Laikago | Proprioceptive / QDD | Domain randomization |
+| Kumar et al. (2021) | Unitree A1 | QDD  | RMA adaptation |
+
+The Go2 (and its predecessor A1) sits in the **middle ground**: simple enough that basic PD control works for steady-state, but with sufficient non-linearities (gear friction, torque saturation) that might become problematic during transient maneuvers. 
+
+This makes it an ideal testbed for comparing all three paradigms, analytical models (Tan), learned actuator models (Hwangbo), and adaptive policies (Kumar).
+
 
 ---
 
@@ -222,7 +241,7 @@ This section provides detailed transient response metrics for command switching 
 
 
 <p align="center">
-    <img width=45% src="videos\mujoco_s1.gif">
+    <img width=45% src="sources\mujoco_s1.gif">
     </br> S1 Scenerio of Straight Walk then Stop in Mujoco
 </p>
 
@@ -252,7 +271,7 @@ This section provides detailed transient response metrics for command switching 
 ### S2 Turn: Transient Metrics (wz: 0.0 → 1.0)
 
 <p align="center">
-    <img width=45% src="videos\mujoco_s2.gif">
+    <img width=45% src="sources\mujoco_s2.gif">
     </br> S2 Scenerio of Straight Walk then Turn in Mujoco
 </p>
 
@@ -278,7 +297,7 @@ This section provides detailed transient response metrics for command switching 
 ### S3 Lateral: Transient Metrics (vy: +0.3 → -0.3)
 
 <p align="center">
-    <img width=45% src="videos\mujoco_s3.gif">
+    <img width=45% src="sources\mujoco_s3.gif">
     </br> S3 Scenerio of Lateral Walking in Mujoco
 </p>
 
@@ -609,8 +628,8 @@ $$\mu_{effective} \approx \sqrt{\mu_{floor} \times \mu_{foot}}$$
 #### Results
 
 <p align="center">
-   <img width=45% src="videos\mujoco_s2.gif">
-   <img width=45% src="videos\delay_20ms.gif">
+   <img width=45% src="sources\mujoco_s2.gif">
+   <img width=45% src="sources\delay_20ms.gif">
    <br> Policy with no Letency vs. Policy with 20ms Letency
 </p>
 
@@ -782,7 +801,7 @@ Total: 750,000 samples (25x more than V1)
 **Results V2 - S2 Command Switch (wz: 0→1.0 at t=3s):**
 
 <p align="center">
-    <img width=50% src="videos\actuator_netv2_s2.gif">
+    <img width=50% src="sources\actuator_netv2_s2.gif">
     <br> ActuatorNet V2 with S2 Command Switch
 </p>
 
@@ -857,8 +876,8 @@ class ActuatorDynamics:
 
 **Results V3 - S2 Turn (wz: 0.0 → 1.0):**
 <p align="center">
-   <img width=45% src="videos\actuator_netv2_s2.gif">
-   <img width=45% src="videos\actuator_netv3_s2.gif">
+   <img width=45% src="sources\actuator_netv2_s2.gif">
+   <img width=45% src="sources\actuator_netv3_s2.gif">
    <br> ActuatorNet V2 vs. ActuatorNet V3
 </p > 
 
@@ -936,8 +955,8 @@ Where `Δτ_learned` compensates for the difference between Isaac Gym and MuJoCo
 **Results - Turn Command (wz=1.0 rad/s, constant):**
 
 <p align="center">
-    <img width=45% src="videos\pd_continuous_turn.gif">
-    <img width=45% src="videos\pd_with_residual_continuous_turn.gif">
+    <img width=45% src="sources\pd_continuous_turn.gif">
+    <img width=45% src="sources\pd_with_residual_continuous_turn.gif">
     <br> Controller vs. PD + Residual Learning Controller
 </p>
 
@@ -1065,8 +1084,8 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 **Results - Turn Command (wz=1.0 rad/s, constant):**
 
 <p align="center">
-    <img width=45% src="videos\pd_continuous_turn.gif">
-    <img width=45% src="videos\randomization_policy.gif">
+    <img width=45% src="sources\pd_continuous_turn.gif">
+    <img width=45% src="sources\randomization_policy.gif">
     Original Policy vs. Policy with Domain Randomization
 </p>
 
