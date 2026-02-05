@@ -4,7 +4,7 @@
 ---
 Sim-to-real transfer for legged locomotion policies faces significant challenges due to differences in simulation environments and real-world hardware, including discrepancies in actuator dynamics, contact modeling, and real-time constraints.
 
-Sim-to-sim transfer serves as a crucial intermediate step, enabling us to evaluate a learned policy’s ability to adapt to different simulation environments before real-world deployment. This helps identify issues such as mismatches in actuator stiffness, friction models, and solver behavior, which could lead to instability during transient behaviors like command switching.vfv
+Sim-to-sim transfer serves as a crucial intermediate step, enabling us to evaluate a learned policy’s ability to adapt to different simulation environments before real-world deployment. This helps identify issues such as mismatches in actuator stiffness, friction models, and solver behavior, which could lead to instability during transient behaviors like command switching.
 
 ---
 This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam form VISTEC. The objective is to analyze **sim-to-sim policy transfer mismatch** for learned legged locomotion policies under **contact-rich dynamics**, with focus on **transient responses induced by command switching**. A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **without retraining** to **MuJoCo (Sim B)**.
