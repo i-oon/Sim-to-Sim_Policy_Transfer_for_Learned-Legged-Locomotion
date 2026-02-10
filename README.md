@@ -7,7 +7,7 @@ Sim-to-real transfer for legged locomotion policies faces significant challenges
 Sim-to-sim transfer serves as a crucial intermediate step, enabling us to evaluate a learned policy’s ability to adapt to different simulation environments before real-world deployment. This helps identify issues such as mismatches in actuator stiffness, friction models, and solver behavior, which could lead to instability during transient behaviors like command switching.
 
 ---
-This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam form VISTEC. The objective is to analyze **sim-to-sim policy transfer mismatch** for learned legged locomotion policies under **contact-rich dynamics**, with focus on **transient responses induced by command switching**. A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **without retraining** to **MuJoCo (Sim B)**.
+This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam from VISTEC. The objective is to analyze **sim-to-sim policy transfer mismatch** for learned legged locomotion policies under **contact-rich dynamics**, with focus on **transient responses induced by command switching**. A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **without retraining** to **MuJoCo (Sim B)**.
 
 <p align="center">
     <img width=45% src="sources\play_isaacgym_1.gif">
@@ -38,6 +38,7 @@ This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam
   - [Stage 1.5: Parameter Ablation](#stage-15-parameter-ablation-one-factor-at-a-time)
   - [Stage 2: Foot Friction Sweep](#stage-2-foot-friction-sweep)
   - [Stage 3: Observation Delay](#stage-3-observation-delay)
+  - [Stage 3.5: Motor Command Delay](#stage-35-motor-command-delay)
 - [Summary of Mismatch Sources](#summary-of-mismatch-sources)
 - [Conclusions](#conclusions)
 - [Bonus: Mismatch Reduction](#bonus-mismatch-reduction-via-learned-actuator-models)
@@ -61,20 +62,20 @@ This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam
 |**Kp=30 in MuJoCo ≈ Kp=20 in Isaac Gym** | 50% stiffness difference | [Stage 1.5](#stage-15-parameter-ablation-one-factor-at-a-time) |
 |**Foot friction is bottleneck**, not floor | μ_foot=0.8 reduces pitch 88% | [Stage 2](#stage-2-foot-friction-sweep) |
 |**Opposite yaw conventions** between sims | Sign difference in wz | [Stage 1](#stage-1-key-observation-divergent-yaw-behavior) |
-|**RMA settling 31% faster** than PD | 220ms vs 320ms in S1 Stop | [Transient Analysis](#s1-stop-transient-metrics-vx-06--00) |
-|**RMA reduces pitch 71%** in S1 Stop | 1.4° vs 4.8° | [Transient Analysis](#s1-stop-transient-metrics-vx-06--00) |
-|**Residual 75% faster rise** in S2 Turn | 20ms vs 80ms | [Transient Analysis](#s2-turn-transient-metrics-wz-00--10) |
+|**DR-trained settling 58% faster** than PD | 160ms vs 380ms in S1 Stop | [Transient Analysis](#s1-stop-transient-metrics-vx-06--00) |
+|**Residual 84% faster vx rise** in S2 Turn | 300ms vs 1880ms | [Transient Analysis](#s2-turn-transient-metrics-wz-00--10) |
+|**Residual 97% faster vx rise** in S3 Lateral | 40ms vs 1280ms | [Transient Analysis](#s3-lateral-transient-metrics-vy-03---03) |
 |**Data diversity > R² score** | ActuatorNet V2 (94.55%) beats V1 (99.21%) | [Bonus](#actuatornet-v2-policy-driven-excitation-data) |
 |**Hwangbo excitation > policy-driven** | ActuatorNet V3 fixes V2's S2 instability | [Bonus](#actuatornet-v3-hwangbo-style-excitation-fixed-s2-instability) |
 |**ActuatorNet V3 reduces S2 pitch 84%** | 17.8° → 2.8° | [Bonus](#actuatornet-v3-hwangbo-style-excitation-fixed-s2-instability) |
-|**Residual Learning improves tracking 12-44%** | Best accuracy approach | [Bonus](#approach-2-residual-learning-pd--learned-correction) |
-| **RMA reduces pitch/roll 22-31%** | Best stability approach | [Bonus](#approach-3-rma-rapid-motor-adaptation) |
-
+|**DR-trained best stability** | Consistently lowest torque & excursions | [Bonus](#approach-3-domain-randomization) |
+|**DR-trained reduces S2 roll 42%** | 6.0° → 3.5° | [Bonus](#approach-3-domain-randomization) |
+|**DR-trained reduces S3 roll 44%** | 4.1° → 2.3° | [Bonus](#approach-3-domain-randomization) |
 ---
 
 ## Overview
 
-This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam form VISTEC.  
+This repository accompanies **Exam 2** of the Sim2Real Internship Candidate Exam from VISTEC.  
 
 The objective is to analyze **sim-to-sim policy transfer mismatch** for learned legged locomotion policies under **contact-rich dynamics**, with focus on **transient responses induced by command switching**.
 
@@ -86,7 +87,7 @@ A locomotion policy is trained in **Isaac Gym (Sim A)** and transferred **withou
     </br> Similarity in IsaacLab and Isaac Gym
 </p>
 
-While we have verified that Isaac Lab can produce deployable policies with equivalent MuJoCo performance, we selected **Isaac Gym as our primary framework** due to its simpler sim-to-sim pipeline of requiring no joint order remapping and its well-adoption in legged locomotion research.
+While we have verified that Isaac Lab can produce deployable policies to Mujoco with equivalent performance of Isaac Gym, we selected **Isaac Gym as our primary framework** due to its simpler sim-to-sim pipeline of requiring no joint order remapping and its well-adoption in legged locomotion research.
 
 ---
 
@@ -107,7 +108,7 @@ While we have verified that Isaac Lab can produce deployable policies with equiv
     </br> The Unitree Go2 is a quadrupedal mobile robot designed for a variety of applications including research, field operations, education, and industrial tasks.
 </p>
 
-
+- **source:** [unitree_rl_gym](https://github.com/unitreerobotics/unitree_rl_gym)
 - **Robot:** Unitree Go2 Quadruped
 - **DOF:** 12 (3 joints × 4 legs)
 - **Joint Order Isaac Gym:** FL, FR, RL, RR (hip, thigh, calf per leg)
@@ -237,107 +238,142 @@ t=0s ─────────────► t=3s ─────────
 
 This section provides detailed transient response metrics for command switching scenarios, measuring rise time, settling time, overshoot, and peak values.
 
+<p align="center">
+    <img width=80% src="plots\transient_overview_all.png">
+    </br> Transient Response comparison between methods in all 3 Scenerios in Mujoco
+</p>
+
 ### S1 Stop: Transient Metrics (vx: 0.6 → 0.0)
 
-
 <p align="center">
-    <img width=45% src="sources\mujoco_s1.gif">
-    </br> S1 Scenerio of Straight Walk then Stop in Mujoco
+    <img width=80% src="plots\transient_S1_comparison.png">
+    </br><img width=80% src="plots\transient_S1_metrics.png">
+    </br> Transient Response comparison between methods in S1 Scenerio in Mujoco
 </p>
 
 
 
-| Metric | PD Only | PD + Residual | RMA | ActuatorNet V2 | Best |
+| Metric | PD Only | PD + Residual | DR-trained | ActuatorNet V3 | Best |
 |--------|---------|---------------|-----|----------------|------|
-| **vx Rise time (10-90%)** | 260 ms | 200 ms | **160 ms** | 200 ms | RMA |
-| **vx Settling time (5%)** | 320 ms | 280 ms | **220 ms** | 260 ms | RMA |
-| **vx Overshoot** | 3.4% | **-0.3%** | 0.4% | -0.8% | Residual |
-| **wz Settling time** | 920 ms | 320 ms | **260 ms** | 260 ms | RMA/ActNet |
-| **Peak torque** | 15.62 N·m | 13.39 N·m | 12.50 N·m | **12.15 N·m** | ActuatorNet V2 |
-| **Peak pitch** | 4.8° | 2.8° | **1.4°** | 4.6° | RMA |
-| **Peak roll** | **1.6°** | 2.5° | 2.3° | 2.2° | PD |
-
+| **vx Rise time (10-90%)** | 300 ms | 200 ms | **140 ms** | 180 ms | DR-trained |
+| **vx Settling time (5%)** | 380 ms | 240 ms | **160 ms** | 240 ms | DR-trained |
+| **vx Overshoot** | 0.5% | 0.9% | **-0.4%** | -0.8% | DR-trained |
+| **wz Settling time** | 160 ms | **40 ms** | 60 ms | 240 ms | Residual |
+| **Peak torque** | 15.93 N·m | 16.16 N·m | **13.85 N·m**  | 14.03 N·m | DR-trained  |
+| **Peak pitch** | 4.7° | 4.8° | 5.2° | **1.5°** | ActuatorNet V3 |
+| **Peak roll** | 3.1° | **2.4°** | 2.8° | 2.5° | Residual |
 
 
 **Key Observations:**
-- RMA achieves **fastest settling** (220ms vs 320ms for PD) — **31% improvement**
-- **ActuatorNet V2 has lowest peak torque** (12.15 N·m) — **22% reduction** from PD
-- Residual & ActuatorNet V2 have **near-zero overshoot** (smoothest response)
-- RMA has **best pitch stability** (1.4° vs 4.8°) — **71% reduction**
-- ActuatorNet V2 performs well in S1 — comparable to RMA in settling time
+- DR-trained achieves **fastest settling** (160ms vs 380ms for PD) — **58% improvement**
+- DR-trained has **lowest peak torque** (13.85 N·m) — **13% reduction** from PD
+- Residual has **fastest wz settling** (40ms) and **best roll stability** (2.4°)
+- ActuatorNet V3 has **exceptional pitch performance** (1.5°) in S1
+- PD has **lowest pitch** (4.7°) among real-time methods
 
 ---
 
 ### S2 Turn: Transient Metrics (wz: 0.0 → 1.0)
 
 <p align="center">
-    <img width=45% src="sources\mujoco_s2.gif">
-    </br> S2 Scenerio of Straight Walk then Turn in Mujoco
+    <img width=80% src="plots\transient_S2_comparison.png">
+    </br><img width=80% src="plots\transient_S2_metrics.png">
+    </br> Transient Response comparison between methods in S2 Scenerio in Mujoco
 </p>
 
-| Metric | PD Only | PD + Residual | RMA | ActuatorNet V2 | Best |
+| Metric | PD Only | PD + Residual | DR-trained | ActuatorNet V3 | Best |
 |--------|---------|---------------|-----|----------------|------|
-| **vx Rise time** | 40 ms | **20 ms** | 60 ms | 20 ms | Residual/ActNet |
-| **wz Rise time** | 80 ms | **20 ms** | 160 ms | 320 ms | Residual |
-| **wz Settling time** | 2980 ms | — | — | 2980 ms | — |
-| **wz Overshoot** | -16.2% | **-10.0%** | -22.7% | 26.3% | Residual |
-| **Peak torque** | 13.55 N·m | 13.51 N·m | **13.23 N·m** | 28.49 N·m X | RMA |
-| **Peak pitch** | 4.6° | **3.8°** | 3.9° | 17.8° X | Residual |
-| **Peak roll** | 5.1° | 6.1° | **2.4°** | 15.3° X | RMA |
+| **vx Rise time** | 1880 ms | 300 ms | 880 ms | **20 ms** | ActuatorNet V3 |
+| **wz Rise time** | N/A | N/A | N/A | 80 ms | ActuatorNet V3 |
+| **wz Settling time** | N/A | N/A | N/A | N/A | — |
+| **wz Overshoot** | -17.1% | **-10.1%** | -23.3% | 26.3% | Residual |
+| **Peak torque** | 15.22 N·m | 14.59 N·m | **13.23 N·m** | 13.34 N·m | DR-trained |
+| **Peak pitch** | 4.7° | 4.6° | 3.9° | **2.8°** | ActuatorNet V3 |
+| **Peak roll** | 6.0° | 5.4° | **3.5°** | 5.1° | DR-trained |
 
 **Key Observations:**
-- Residual has **fastest wz rise time** (20ms vs 80ms) — **75% faster**
-- Residual has **smallest wz overshoot** (-10% vs -16% to -23%)
-- RMA has **best roll stability** (2.4° vs 5.1°) — **53% reduction**
-- **ActuatorNet V2 is unstable in S2** — high torque (28.49 N·m), pitch (17.8°), roll (15.3°)
-- Turn scenario reveals largest controller differences
+- Residual has **fastest vx rise time** (300ms vs 1880ms) — **84% faster**
+- Residual has **smallest wz overshoot** (-10.1% vs -17% to -23%)
+- DR-trained has **best stability** (pitch -17%, roll -42% vs PD)
+- ActuatorNet V3 has **best pitch** (2.8°) but struggles with overshoot
+- Turn scenario never fully settles for PD-based methods
 
 ---
 
 ### S3 Lateral: Transient Metrics (vy: +0.3 → -0.3)
 
 <p align="center">
-    <img width=45% src="sources\mujoco_s3.gif">
-    </br> S3 Scenerio of Lateral Walking in Mujoco
+    <img width=80% src="plots\transient_S3_comparison.png">
+    </br><img width=80% src="plots\transient_S3_metrics.png">
+    </br> Transient Response comparison between methods in S3 Scenerio in Mujoco
 </p>
 
-| Metric | PD Only | PD + Residual | RMA | ActuatorNet V2 | Best |
+| Metric | PD Only | PD + Residual | DR-trained | ActuatorNet V3 | Best |
 |--------|---------|---------------|-----|----------------|------|
-| **wz Rise time** | 260 ms | 340 ms | **220 ms** | 520 ms | RMA |
-| **Peak torque** | 13.77 N·m | 13.76 N·m | **12.18 N·m** | 13.56 N·m | RMA |
-| **Peak pitch** | 5.2° | 5.2° | **4.8°** | 5.1° | RMA |
-| **Peak roll** | 3.6° | 5.7° | **2.1°** | 2.9° | RMA |
+| **vx Rise time** | 1280 ms | **40 ms** | 1120 ms | 520 ms | Residual |
+| **vy Rise time** | 620 ms | **420 ms** | 620 ms | — | Residual |
+| **wz Settling time** | N/A | N/A | 2800 ms | — | DR-trained |
+| **Peak torque** | 14.02 N·m | 13.95 N·m | **12.18 N·m** | 13.88 N·m | DR-trained |
+| **Peak pitch** | 5.3° | 5.2° | 4.8° | **4.5°** | ActuatorNet V3 |
+| **Peak roll** | 4.1° | 5.5° | **2.3°** | 6.3° | DR-trained |
 
 **Key Observations:**
-- RMA consistently has **lowest peak torque** (12.18 N·m) — **12% reduction**
-- RMA has **best roll stability** (2.1° vs 3.6°) — **42% reduction**
-- ActuatorNet V2 performs well in S3 — similar to PD baseline
-- Lateral scenario is less demanding than turn (S2)
+- Residual has **extremely fast vx rise** (40ms) — **97% faster** than PD
+- DR-trained consistently has **lowest peak torque** (12.18 N·m) — **13% reduction**
+- DR-trained has **best roll stability** (2.3° vs 4.1°) — **44% reduction**
+- ActuatorNet V3 performs well overall but shows high roll (6.3°)
 
 ---
 
 ### Transient Response Summary
 
+
 | Controller | S1 Stop | S2 Turn | S3 Lateral | Overall |
+|------------|---------|---------|------------|---------|
+| **PD Only** | Baseline | High overshoot | Baseline | Baseline |
+| **PD + Residual** | Fast wz settling | **Best wz overshoot** | **Fastest vx rise** | Best speed |
+| **DR-trained** | **Best overall** | **Best stability** | **Best stability** | **Best robustness** |
+| **ActuatorNet V3** | Best pitch | Good pitch | Good pitch | Specialized |
+
+**Recommendations:**
+- **For best stability/robustness:** DR-trained Policy
+- **For best tracking speed:** PD + Residual Learning
+- **For specialized pitch control:** ActuatorNet V3 (when data available)
+- **For baseline comparison:** PD Only
+
+**Overall Findings:**
+
+1. **DR-trained excels at stability metrics** — consistently lowest torque (12-14 N·m), pitch (3.9-5.2°), and roll (2.3-3.5°)
+2. **Residual excels at response speed** — fastest rise times in S2 (300ms vx) and S3 (40ms vx)
+3. **ActuatorNet V3 provides specialized benefits** — exceptional pitch control when systematic excitation data available
+4. **Trade-off exists:**
+   - DR-trained: Best stability, higher training complexity
+   - Residual: Faster response, moderate complexity, good balance
+   - ActuatorNet V3: Specialized performance, requires systematic data collection
+   - PD Only: Simple, but highest peak values
+5. **S2 Turn is most challenging** — no method achieves full settling
+6. **Transient metrics reveal critical differences** not visible in steady-state tracking
+
+| |  |  |  | |
 |------------|---------|---------|------------|---------|
 | **PD Only** | Baseline | Oscillatory | Baseline | Baseline |
 | **PD + Residual** | Fast rise, smooth | **Fastest wz (20ms)** | Similar to PD | Best speed |
-| **RMA** | **Best settling (220ms)** | **Best stability** | **Best stability** | **Best overall** |
-| **ActuatorNet V2** | ✓ **Best torque** | ⚠️ **Unstable** | ✓ Good | Limited use |
+| **DR-trained** | **Best settling (220ms)** | **Best stability** | **Best stability** | **Best overall** |
+| **ActuatorNet V3** | ✓ **Best torque** | ⚠️ **Unstable** | ✓ Good | Limited use |
 
 **Recommendations:**
-- **For best stability/robustness:** RMA Policy
+- **For best stability/robustness:** DR-trained Policy
 - **For best tracking speed:** PD + Residual Learning
 - **For ActuatorNet users:** Use **V3 (Hwangbo-style)**, avoid V2 for turn scenarios
 - **Key V2→V3 improvement:** S2 Turn pitch reduced from 17.8° to 2.8° (84% improvement)
 
 **Overall Findings:**
 
-1. **RMA excels at stability metrics** — consistently lowest torque, pitch, and roll
+1. **DR-trained excels at stability metrics** — consistently lowest torque, pitch, and roll
 2. **Residual excels at response speed** — fastest rise time in S2 Turn
 3. **ActuatorNet V3 fixes V2's critical weakness** — now stable in S2 Turn scenario
 4. **Trade-off exists:**
-   - RMA: Best stability, higher complexity
+   - DR-trained: Best stability, higher complexity
    - Residual: Faster response, moderate complexity
    - ActuatorNet V3: Good balance, systematic data collection required
 5. **Transient metrics reveal differences not visible in steady-state**
@@ -401,6 +437,12 @@ base_ang_vel = quat_rotate_inverse(quat, world_ang_vel)
 
 #### S1: Stop Shock (vx: 0.6 → 0.0)
 
+<p align="center">
+    <img width=45% src="sources\isaacgym_s1.gif">
+    <img width=45% src="sources\mujoco_s1.gif">
+    </br> S1 Scenerio of Straight Walk then Stop in Mujoco
+</p>
+
 | Metric | Isaac Gym | MuJoCo | Gap |
 |--------|-----------|--------|---|
 | Steady-State vx | 0.610 m/s | 0.566 m/s | -0.044 |
@@ -410,6 +452,12 @@ base_ang_vel = quat_rotate_inverse(quat, world_ang_vel)
 | Fallen | No | No | — |
 
 #### S2: Turn Shock (wz: 0.0 → 1.0)
+
+<p align="center">
+    <img width=45% src="sources\isaacgym_s2.gif">
+    <img width=45% src="sources\mujoco_s2.gif">
+    </br> S2 Scenerio of Straight Walk then Turn in Mujoco
+</p>
 
 | Metric | Isaac Gym | MuJoCo | Gap |
 |--------|-----------|--------|---|
@@ -422,6 +470,12 @@ base_ang_vel = quat_rotate_inverse(quat, world_ang_vel)
 *Note: Isaac Gym wz has opposite sign convention — see below.
 
 #### S3: Lateral Flip (vy: +0.3 → -0.3)
+
+<p align="center">
+    <img width=45% src="sources\isaacgym_s3.gif">
+    <img width=45% src="sources\mujoco_s3.gif">
+    </br> S3 Scenerio of Lateral Walking in Mujoco
+</p>
 
 | Metric | Isaac Gym | MuJoCo | Gap |
 |--------|-----------|--------|---|
@@ -531,7 +585,7 @@ if self.cfg.commands.heading_command:
 
 **Goal:** Identify causal sources of mismatch by varying parameters individually in MuJoCo.
 
-#### Kp (Stiffness) Sweep
+#### 1. Kp (Stiffness) Sweep
 
 | Kp | vx mean | vx error | Notes |
 |----|---------|----------|-------|
@@ -548,7 +602,63 @@ if self.cfg.commands.heading_command:
    </br> Kp=30 in Mujoco best matches Isaac Gym 
 </p>
 
-#### dt (Timestep) Sweep
+
+#### 2. Kd (Damping) Sweep
+
+| Kd | vx mean | wz overshoot | Max pitch | Max roll | Peak torque |
+|----|---------|-------------|-----------|----------|-------------|
+| 0.3 | 0.348 m/s | -0.167 | 4.5° | 6.3° | 14.82 N·m |
+| **0.5 (baseline)** | **0.353 m/s** | **-0.161** | **5.0°** | **5.1°** | **15.32 N·m** |
+| 0.8 | 0.349 m/s | -0.079 | 5.0° | 6.9° | 15.25 N·m |
+| 1.0 | 0.344 m/s | -0.090 | 4.7° | 5.1° | 15.22 N·m |
+
+
+<p align="center">
+   <img src="plots\kd_ablation.png" width="600" alt="kd_ablation">
+   </br> Kp=30 in Mujoco best matches Isaac Gym 
+</p>
+
+
+**Finding:** Kd has minimal effect on both tracking and transient stability. Unlike Kp — where a 10→40 sweep produced dramatic changes from near-crawling to overshoot — varying Kd by 3× (0.3→1.0) produces less than 0.1 rad/s difference in wz overshoot and no fall in any condition. Higher Kd slightly reduces overshoot (Kd=0.8 achieves -0.079 vs -0.167 at Kd=0.3) but does not meaningfully change peak torque or body excursion. This confirms that **actuator stiffness (Kp), not damping (Kd), is the dominant PD gain mismatch** in this sim-to-sim transfer.
+
+#### 3. Mass (Base Link) Perturbation
+
+| Base mass | Δmass | vx (steady) | wz overshoot | Max pitch | Peak torque |
+|-----------|-------|------------|-------------|-----------|-------------|
+| 5.921 kg | -1 kg | 0.363 m/s | -0.220 | 3.8° | 13.63 N·m |
+| **6.921 kg (baseline)** | **0** | **0.353 m/s** | **-0.161** | **5.0°** | **15.32 N·m** |
+| 7.921 kg | +1 kg | 0.358 m/s | +0.374 | **15.5°**  | **23.11 N·m**  |
+| 8.921 kg | +2 kg | 0.237 m/s | -0.049 | 11.2°  | 21.56 N·m  |
+
+<p align="center">
+   <img src="plots\mass_ablation.png" width="600" alt="mass_ablation">
+   </br> Adding +1 kg nearly triples peak pitch
+</p>
+
+**Finding:** Mass perturbation has a significant and **asymmetric** effect on transient stability. Adding just +1 kg (14% increase) nearly triples peak pitch (15.5° vs 5.0°) and increases peak torque by 51%, while removing -1 kg has minimal impact. At +2 kg, the robot can barely maintain forward velocity (0.237 vs 0.353 m/s) as the policy's learned torque patterns become insufficient for the increased inertia.
+
+This asymmetry is consistent with the policy being trained at a fixed mass — additional mass demands torques beyond what the policy learned to produce, while reduced mass stays within the policy's safe operating envelope. This finding further validates the Domain Randomization approach (Approach 3), which randomizes mass during training by [-1 kg, +2 kg] to explicitly handle such variation.
+
+
+#### 4. Joint Friction (Viscous + Coulomb) Sweep
+
+MuJoCo's go2.xml includes joint-level friction parameters (`damping` for viscous friction, `frictionloss` for Coulomb friction) that have no direct equivalent in Isaac Gym's PhysX engine. We sweep these to quantify their contribution:
+
+| Condition | damping | frictionloss | vx (steady) | wz overshoot | Max roll | Max pitch | Peak torque |
+|-----------|---------|-------------|------------|-------------|----------|-----------|-------------|
+| No friction | 0.0 | 0.0 | 0.361 m/s | -0.147 | **9.3°** | 5.0° | 14.79 N·m |
+| **Baseline** | **0.1** | **0.2** | **0.353 m/s** | **-0.161** | **5.1°** | **5.0°** | **15.32 N·m** |
+| High friction | 0.3 | 0.5 | 0.326 m/s | -0.054 | **3.4°** | 4.7° | 15.02 N·m |
+
+<p align="center">
+   <img src="plots\joint_friction_ablation.png" width="600" alt="mass_ablation">
+   </br> Joint friction behaved like a passive damper
+</p>
+
+**Finding:** Joint friction has a moderate effect, primarily on **roll stability** rather than tracking or torque. Removing all joint friction increases peak roll by 82% (9.3° vs 5.1°), while high friction reduces it by 33% (3.4°) at the cost of slower velocity tracking. Unlike Kp which affects overall actuator response, joint friction acts as a passive damper that suppresses oscillation during transient maneuvers. This represents a **structural mismatch** between simulators — MuJoCo models joint friction explicitly, while Isaac Gym's PhysX does not expose equivalent parameters, potentially absorbing similar effects into its contact solver.
+
+
+#### 5. dt (Timestep) Sweep
 
 | dt | decimation | Policy rate | vx mean | vx error |
 |----|------------|-------------|---------|----------|
@@ -558,7 +668,7 @@ if self.cfg.commands.heading_command:
 
 **Finding:** Timestep has minimal effect when policy rate is kept constant at 50 Hz.
 
-#### Floor Friction Sweep
+#### 6. Floor Friction Sweep
 
 | Floor friction | vx mean | vx error |
 |----------------|---------|----------|
@@ -566,17 +676,24 @@ if self.cfg.commands.heading_command:
 | 1.0 | 0.451 | 0.049 |
 | 1.5 | 0.451 | 0.049 |
 
-**Finding:** Floor friction has no measurable effect.
+**Finding:** Floor friction has no measurable effect across the entire tested range.
 
 > The floor friction sweep initially produced a surprising result: varying μ_floor between 0.5 and 1.5 resulted in no observable change. This raised a critical follow-up question: Is friction truly irrelevant, or are we varying the wrong parameter?
+
 
 ---
 
 ### Stage 2: Foot Friction Sweep
 
-The floor friction sweep produced no observable change. This motivated testing **foot friction** directly, since MuJoCo uses geometric mean of contacting surfaces:
+To further investigate why the behavior of the floor friction sweep produced no observable change, this motivated us testing **foot friction** directly. And we found that MuJoCo uses geometric mean of contacting surfaces:
 
 $$\mu_{effective} \approx \sqrt{\mu_{floor} \times \mu_{foot}}$$
+
+Because the default foot friction in MuJoCo is low (μ_foot=0.4), the effective friction remains low (≈0.63) even if the floor friction is increased significantly.
+
+Since incresing **the floor friction** is physically unrealistic, as [Tan et al., 2018](https://arxiv.org/abs/1804.10332) had said that real-world surfaces used in robotics research range from approximately **0.5 (polished tile) to 1.25 (rubber mat)**. Pushing μ_floor beyond this range to compensate for low foot friction would produce a policy tuned to an environment that doesn't exist in the real world, defeating the purpose of sim-to-sim validation.
+
+To match the dynamics of Isaac Gym (where μ≈1.0), we hypothesized that the foot friction must be the primary variable for tuning (System ID).
 
 **Method:** Vary foot friction μ_foot ∈ {0.2, 0.4, 0.8} while holding floor friction constant at 1.0.
 
@@ -591,13 +708,13 @@ $$\mu_{effective} \approx \sqrt{\mu_{floor} \times \mu_{foot}}$$
 | Peak torque | **27.57 N·m** | 15.32 N·m | **13.65 N·m** |
 
 <p align="center">
-   <img src="plots\foot_friction_ablation.png" width="500" alt="foot_friction_ablation">
+   <img src="plots\foot_friction_ablation.png" width="600" alt="foot_friction_ablation">
    <br> Foot Friction of 0.2, 0.4, 0.8 while holding floor friction constant at 1.0.
 </p>  
 
 #### Stage 2 Findings
 
-1. **Foot friction has significant impact** while floor friction did not — confirming that foot friction is the bottleneck.
+1. **Foot friction has significant impact** while floor friction had little influenced — confirming that foot friction is the bottleneck.
 
 2. **High friction (μ=0.8) improves stability:**
    - Max roll: 5.3° (vs 17.8° at μ=0.2) — **70% reduction**
@@ -641,7 +758,7 @@ $$\mu_{effective} \approx \sqrt{\mu_{floor} \times \mu_{foot}}$$
 | Max roll | 5.1° | **167.8°** | 18.8° |
 | Max pitch | 5.0° | **35.1°** | 28.4° |
 | Peak torque | 15.32 N·m | **27.57 N·m (+80%)** | 26.21 N·m (+71%) |
-| **Fallen** | No | **YES** 🔴 | No |
+| **Fallen** | No | **YES**  | No |
 
 <p align="center">
    <img src="plots\delay_ablation.png" width="500" alt="delay_ablation">
@@ -666,17 +783,98 @@ This is a critical finding for sim-to-real transfer:
 
 ---
 
+---
+
+### Stage 3.5: Motor Command Delay
+
+> Stage 3 demonstrated that observation delay (input-side latency) is critically destabilizing. However, real robots also experience actuator command delay — the time between computing a torque command and the motor physically executing it. We now test this output-side counterpart to complete the latency analysis.
+
+**Goal:** Evaluate sensitivity to motor command latency during transient command switches and compare with observation delay from Stage 3.
+
+**Method:** Buffer the target joint positions by 0, 1, 2 policy steps (0, 20, 40 ms) before applying PD control. Unlike observation delay where the policy receives stale state, here the policy observes correct state but the actuators execute outdated commands.
+
+**Scenario:** S2 Turn (consistent with Stage 3)
+
+#### Results
+
+<p align="center">
+   <img width=45% src="sources\mujoco_s2.gif">
+   <img width=45% src="sources\motor_delay_40s.gif">
+   <br> Motor Input with no Letency vs. Motor Input with 40ms Letency
+</p>
+
+| Motor delay | wz overshoot | Max pitch | Max roll | Peak torque | Fallen |
+|-------------|-------------|-----------|----------|-------------|--------|
+| 0 ms | -0.161 | 5.0° | 5.1° | 15.32 N·m | No |
+| 20 ms (1 step) | +0.241 | 6.1° | 5.3° | 19.44 N·m | No |
+| 40 ms (2 steps) | +0.246 | 18.9° | 73.5° | exploded | **YES**  |
+
+#### Stage 3.5 Key Finding: Motor Delay is Less Critical than Observation Delay
+
+
+
+Comparing both delay types at the same latency values reveals a clear asymmetry:
+
+| Delay | Observation (input, Stage 3) | Motor command (output, Stage 3.5) |
+|-------|--------------------|-----------------------|
+| 0 ms | Stable | Stable |
+| 20 ms | **FELL** | Stable |
+| 40 ms | Stable | **FELL**  |
+
+*Observation delay at 40ms shows chaotic sensitivity — see Stage 3.
+
+**20ms motor delay is survivable**  while 20ms observation delay caused immediate fall. This asymmetry makes physical sense:
+
+- **Observation delay** → policy makes decisions based on **stale state** → compounding errors (thinks robot hasn't turned yet, keeps commanding turn)
+- **Motor delay** → policy sees **correct state** and makes appropriate decisions → only execution is late → self-correcting to some degree
+
+<p align="center">
+   <img src="plots\motor_delay_ablation.png" width="600" alt="motor_delay_ablation">
+   <br> Observation Delay vs. Motor Delay
+</p>
+
+At 40ms motor delay, the execution lag becomes too large and the robot falls — confirming that both delay sources matter, but with different severity thresholds.
+
+> **Implication for sim-to-real:** Observation latency is more dangerous than actuator latency. When designing real-time control pipelines, prioritize **low-latency state estimation** (IMU, joint encoders) over actuator response time. For the Go2's QDD actuators with typical command latency of ~5-10ms, motor delay alone is unlikely to cause instability — but combined with sensing latency, the total loop delay could exceed critical thresholds. This aligns with **Tan's paper** findings on the Minitaur, where identifying and modeling latency (approx. 15-19ms in their case) was crucial for preventing oscillations during sim-to-real transfer.
+
+
 ## Summary of Mismatch Sources
+
+### Physics Mismatch (Ablated)
 
 | Source | Effect on Tracking | Effect on Stability | Recommendation |
 |--------|-------------------|---------------------|----------------|
 | **Kp (stiffness)** | High | Medium | Use Kp=30 in MuJoCo to match Isaac Gym Kp=20 |
+| **Kd (damping)** | Low | Low | Not a significant factor (Kp dominates) |
+| **Mass perturbation** | Medium | **High** | +1kg nearly triples pitch; asymmetric response |
+| **Joint friction** | Low | Medium | Affects roll stability; structural mismatch between sims |
 | **Foot friction** | Medium | **High** | Match μ_foot to real robot (~0.6-0.8 for rubber) |
-| **Floor friction** | None | None | Not a significant factor |
+| **Floor friction** | None | None | Not a significant factor (bottleneck is foot) |
 | **Timestep** | Low | Low | Keep policy rate constant |
-| **Observation delay** | Medium | **Critical** | Add 20-40ms delay in sim for robustness |
-| **Yaw convention** | — | — | Document and handle sign difference |
+| **Observation delay** | Medium | **Critical** | 20ms causes fall in S2 Turn |
+| **Motor command delay** | Low | **High** | Less critical than obs delay; 20ms survivable, 40ms causes fall |
 | **Torque clipping** | Medium | High | Isaac Gym clips at ±30 N·m (implicit) |
+| **Velocity-dependent dynamics** | Medium | High | Isaac Gym has implicit vel-dependent compensation; residual learning captures this |
+
+### Implementation Pitfalls
+
+| Source | Description | Fix |
+|--------|-------------|-----|
+| **Quaternion convention** | Isaac Gym (x,y,z,w) vs MuJoCo (w,x,y,z) | Reorder before computing gravity/velocity |
+| **Yaw sign convention** | Opposite rotation direction between sims | Document and flip sign in comparison plots |
+| **Actuator ordering** | MuJoCo ctrl uses FR,FL,RR,RL | Remap: `ctrl[0:3]=tau[3:6]`, etc. |
+| **Heading command mode** | `heading_command=True` overwrites `commands[:,2]` | Set `commands[:,3]` (target heading), not `[:,2]` (wz) |
+
+### Known but Not Ablated
+
+The following mismatch sources are identified in prior sim-to-real literature but were not individually ablated in this study. They remain relevant for future investigation:
+
+| Source | Referenced In | Description | Expected Impact |
+|--------|-------------|-------------|-----------------|
+| **Contact solver differences** | Implicit in all papers | PhysX (Isaac Gym) uses iterative Gauss-Seidel while MuJoCo uses Newton-based convex optimization — fundamentally different contact resolution | High — likely a root cause of the Kp stiffness gap, but cannot be isolated without modifying solver internals |
+| **Ground compliance** | Peng et al. (2020) | Rigid vs. soft contact modeling differences between engines | Low — both simulators use rigid flat ground in this study |
+
+> **Note:** The contact solver difference is likely the most impactful untested source, as it affects how forces propagate through the kinematic chain during contact. The observed Kp mismatch (Stage 1.5) and foot friction sensitivity (Stage 2) are both downstream effects of different solver behaviors. However, this cannot be ablated as a single parameter — it is an architectural difference between simulation engines.
 
 ---
 
@@ -684,41 +882,40 @@ This is a critical finding for sim-to-real transfer:
 
 ### Key Findings
 
-1. **Transient command switching reveals mismatch not visible in steady-state.** 
-   - S2 Turn shows largest gaps in torque and stability metrics
-   - Steady-state tracking differs by only ~9%, but transient behavior diverges significantly
+1.  **Steady-state metrics mask critical instability exposed by transient maneuvers.**
+    
+    While the baseline velocity tracking error differed by only **~9%** during steady walking, the **S2 Turn** scenario revealed divergences in stability. This confirms that sim-to-sim validation must prioritize transient response analysis (overshoot, rise time) over steady-state averages.
 
-2. **Simulators have opposite yaw conventions.**
-   - Isaac Gym and MuJoCo rotate in opposite directions for same wz command
-   - Both rotate ~118° magnitude, confirming policy works but conventions differ
+2.  **Simulators enforce conflicting coordinate conventions.**
+    
+    Isaac Gym and MuJoCo exhibit **opposite yaw rotation directions** for the same positive $w_z$ command. Despite the sign mismatch, the magnitude of rotation ($\approx 118^\circ$) was consistent, indicating a coordinate system difference rather than a policy failure.
 
-3. **Actuator stiffness (Kp) requires ~50% increase in MuJoCo.**
-   - Kp=30 in MuJoCo ≈ Kp=20 in Isaac Gym
-   - Likely due to different contact solver dynamics
+3.  **Solver stiffness discrepancy necessitates gain tuning ($K_p$).**
+    
+    Matching actuator performance required increasing $K_p$ in MuJoCo ($30$ vs. $20$ in Isaac Gym). This suggests that Isaac Gym’s PhysX engine (iterative solver) behaves "softer" than MuJoCo’s Newton-based solver, requiring higher gains in MuJoCo to achieve equivalent stiffness.
 
-4. **Foot friction is the contact bottleneck, not floor friction.**
-   - μ_foot=0.8 reduces peak torque by 50% and pitch by 88%
-   - MuJoCo uses geometric mean, so lower value dominates
+4.  **Contact stability is bottlenecked by foot friction, not floor friction.**
+    
+    Varying floor friction had no effect due to MuJoCo’s geometric mean calculation ($\sqrt{\mu_{floor}\mu_{foot}}$). Increasing $\mu_{foot}$ to **0.8** (rubber) resolved the bottleneck, reducing peak torque by **50%** and pitch oscillation by **88%**.
 
-5. **20ms observation delay causes fall during turning.**
-   - Critical finding for sim-to-real transfer
-   - Transient maneuvers are highly sensitive to latency
-   - Steady-state metrics do not predict this failure
+5.  **Observation latency is the critical failure mode.**
+    
+    A mere **20ms observation delay** caused immediate falls during turning maneuvers, whereas motor command delays of the same magnitude were survivable. This highlights that "input-side" latency (state estimation) is significantly more destabilizing than "output-side" latency.
 
-6. **Isaac Gym applies implicit torque clipping at ±30 N·m.**
-   - Discovered during residual learning analysis
-   - This affects high-torque maneuvers like turning
+
+
+
 
 ### Answers to Research Questions
 
 **Q1: Why do policies diverge during transients?**
-> Contact dynamics (friction, solver) and observation timing affect transient response more than steady-state. The policy's corrective actions are amplified differently in each simulator. Additionally, Isaac Gym's implicit torque clipping is not present in MuJoCo by default.
+> Policies diverge because transient states (high acceleration) expose implicit simulator behaviors that remain dormant during steady-state. Specifically, differences in contact solver stiffness (PhysX vs. Newton) and observation timing amplify errors when the policy commands rapid corrections. Crucially, Isaac Gym's implicit torque clipping (±30 N·m) acts as a "silent safety net" that is absent in MuJoCo, causing the same policy to produce destabilizing torque spikes in the new environment.
 
 **Q2: Which mismatches are amplified during high-acceleration maneuvers?**
-> Foot friction and observation delay have the largest impact during transients. Actuator stiffness affects both steady-state and transient equally. Torque clipping becomes critical during high-demand maneuvers.
+> Observation delay and Foot friction are the most amplified mismatches. A 20ms delay, which is negligible during walking, becomes catastrophic during rapid turns due to phase lag in the feedback loop. Similarly, low foot friction creates a "slip-prone regime" only when lateral forces peak. While actuator stiffness (Kp) affects dynamics globally, torque saturation limits become the deciding factor between stability and failure during high-demand command switches (S2).
 
 **Q3: Can transient metrics serve as better transferability indicators?**
-> **Yes.** The 20ms delay causes fall during S2 Turn but has minimal effect on steady-state tracking. Transient metrics (peak torque, max pitch, fall detection) are more sensitive indicators.
+> **Yes**. Steady-state metrics proved deceptive, showing only a ~9% gap even when the policy was critically unstable. Transient metrics (specifically Overshoot, Rise Time, and Peak Torque) successfully revealed the system's fragility to latency and friction. Therefore, "Survival during Transients" is a far superior predictor of Sim-to-Real robustness than "Average Tracking Error."
 
 ### Recommendations for Sim-to-Real Transfer
 
@@ -904,10 +1101,16 @@ class ActuatorDynamics:
 
 #### ActuatorNet Conclusions
 
+<p align="center">
+    <img width=80% src="plots/actuatornet_s2_v2_v3_fix.png">
+    <br> ActuatorNet Performance of V2 and V3 Compares to PD Controller 
+</p>
+
+
 | Version | Data Type | Normal Walking | Constant Turn | Command Switch (S2) |
 |---------|-----------|----------------|---------------|---------------------|
 | **V1** | Normal walking | X Worse | — | — |
-| **V2** | Policy excitation | ✓ Comparable | ✓ Stable | ⚠️ **Unstable** |
+| **V2** | Policy excitation | ✓ Comparable | ✓ Stable |  **Unstable** |
 | **V3** | Hwangbo excitation | ✓ Comparable | ✓ Stable | ✓ **Stable** |
 
 **Key Insights:**
@@ -922,7 +1125,7 @@ class ActuatorDynamics:
 - Include **sinusoidal sweeps** across 0.5-10 Hz frequency range
 - Add **chirp signals** for continuous frequency coverage
 - Include **torque saturation probing** to reach actuator limits
-- For best overall robustness, prefer **RMA** over ActuatorNet
+- For best overall robustness, prefer **DR-trained** over ActuatorNet
 
 ---
 
@@ -957,7 +1160,7 @@ Where `Δτ_learned` compensates for the difference between Isaac Gym and MuJoCo
 <p align="center">
     <img width=45% src="sources\pd_continuous_turn.gif">
     <img width=45% src="sources\pd_with_residual_continuous_turn.gif">
-    <br> Controller vs. PD + Residual Learning Controller
+    <br> PD Controller vs. PD + Residual Learning Controller
 </p>
 
 
@@ -1074,7 +1277,7 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 
 **Results - Baseline (vx=0.5 m/s):**
 
-| Metric | Original Policy | RMA Policy | Change |
+| Metric | Original Policy | DR-trained Policy | Change |
 |--------|-----------------|------------|--------|
 | vx error | **0.049 m/s** | 0.072 m/s | +47% X |
 | Torque max | 15.71 N·m | **13.01 N·m** | **-17%** ✓ |
@@ -1086,7 +1289,7 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 <p align="center">
     <img width=45% src="sources\pd_continuous_turn.gif">
     <img width=45% src="sources\randomization_policy.gif">
-    Original Policy vs. Policy with Domain Randomization
+    </br>Original Policy vs. Policy with Domain Randomization
 </p>
 
 | Metric | Original Policy | DR Policy | Change |
@@ -1095,20 +1298,23 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 | vx error | N/A | 0.033 m/s | — |
 | Torque max | exploded | 14.36 N·m | — |
 
+
+
 **Results - S2 Command Switch (wz: 0→1.0 at t=3s):**
 
-| Metric | Original Policy | DR Policy | Change |
-|--------|-----------------|------------|--------|
-| Torque max | 15.32 N·m | **13.23 N·m** | **-14%** ✓ |
-| Max pitch | 5.0° | **3.9°** | **-22%** ✓ |
-| Max roll | 5.1° | **3.5°** | **-31%** ✓ |
+| Metric | PD Only | DR Policy | Change |
+|--------|---------|-----------|--------|
+| Torque max | 15.22 N·m | **13.23 N·m** | **-13%** ✓ |
+| Max pitch | 4.7° | **3.9°** | **-17%** ✓ |
+| Max roll | 6.0° | **3.5°** | **-42%** ✓ |
 | vx error (after) | 0.040 m/s | **0.029 m/s** | **-28%** ✓ |
 
-**Conclusion:** RMA provides:
-- **Better stability** during challenging maneuvers (turn, command switch)
-- **Lower peak torques** (-14% to -17%)
-- **Reduced body excursions** (pitch -22%, roll -31%)
-- Trade-off: Slightly worse steady-state tracking in baseline conditions
+**Conclusion:** DR-trained provides:
+- **Best stability** during challenging maneuvers (turn, command switch)
+- **Lower peak torques** (-13% to -17%)
+- **Significantly reduced body excursions** (pitch -17%, roll -42%)
+- **Robust across all scenarios** — consistently best stability metrics
+
 
 **Key Insight:** Domain randomization during training makes the policy robust to simulator differences. The policy learns to handle variations in friction, mass, and gains — which implicitly covers MuJoCo's different dynamics.
 
@@ -1116,27 +1322,56 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 
 ### Final Comparison: All Approaches
 
-| Approach | Baseline vx | Turn Const | S2 Switch | S2 Pitch | S2 Roll | Complexity |
-|----------|-------------|------------|-----------|----------|---------|------------|
-| **PD Only** | 0.049 m/s | X **FELL** | ✓ Stable | 5.0° | 5.1° | Low |
-| **PD + Clipping** | — | X **FELL** | — | — | — | Low |
-| **ActuatorNet V1** | 0.277 m/s | — | — | — | — | Medium |
-| **ActuatorNet V2** | 0.062 m/s | ✓ Stable | **Unstable** | 17.8° X | 15.3° X | Medium |
-| **ActuatorNet V3** | ~0.06 m/s | ✓ Stable | ✓ **Stable** | **2.8°** ✓ | 5.1° | Medium |
-| **PD + Residual** | **0.043 m/s** | ✓ Stable | ✓ Stable | 4.4° | 6.1° | Medium |
-| **DR Policy** | 0.072 m/s | ✓ Stable | ✓ Stable | 3.9° | **2.4°** | High |
+| Approach | S1 Pitch | S1 Roll | S1 Torque | S2 Pitch | S2 Roll | S2 Torque | S3 Pitch | S3 Roll | S3 Torque | Complexity |
+|----------|----------|---------|-----------|----------|---------|-----------|----------|---------|-----------|------------|
+| **PD Only** | 4.7° | 3.1° | 15.93 N·m | 4.7° | 6.0° | 15.22 N·m | 5.3° | 4.1° | 14.02 N·m | Low |
+| **PD + Residual** | 4.8° | **2.4°** | 16.16 N·m | 4.6° | 5.4° | 14.59 N·m | 5.2° | 5.5° | 13.95 N·m | Medium |
+| **DR Policy** | 5.2° | 2.8° | **13.85 N·m** | **3.9°** | **3.5°** | **13.23 N·m** | **4.8°** | **2.3°** | **12.18 N·m** | High |
+| **ActuatorNet V3** | **1.5°** | 2.5° | 14.03 N·m | **2.8°** | 5.1° | 13.34 N·m | 4.5° | 6.3° | 13.88 N·m | Medium |
+
+**Key Improvements:**
+
+| Metric | Best Method | vs PD Only | Improvement |
+|--------|-------------|------------|-------------|
+| S1 Pitch | ActuatorNet V3 | 4.7° → 1.5° | **68%** ✓ |
+| S1 Torque | DR-trained | 15.93 → 13.85 N·m | **13%** ✓ |
+| S2 Pitch | ActuatorNet V3 | 4.7° → 2.8° | **40%** ✓ |
+| S2 Roll | DR-trained | 6.0° → 3.5° | **42%** ✓ |
+| S2 Torque | DR-trained | 15.22 → 13.23 N·m | **13%** ✓ |
+| S3 Roll | DR-trained | 4.1° → 2.3° | **44%** ✓ |
+| S3 Torque | DR-trained | 14.02 → 12.18 N·m | **13%** ✓ |
+
+
+
+### Final Comparison: All Approaches
+
+| Approach | Baseline vx | Turn Const | S2 Switch | S2 Pitch | S2 Roll | S2 Torque | Complexity |
+|----------|-------------|------------|-----------|----------|---------|-----------|------------|
+| **PD Only** | 0.049 m/s | X **FELL** | ✓ Stable | 4.7° | 6.0° | 15.22 N·m | Low |
+| **PD + Clipping** | — | X **FELL** | — | — | — | — | Low |
+| **ActuatorNet V1** | 0.277 m/s | — | — | — | — | — | Medium |
+| **ActuatorNet V2** | 0.062 m/s | ✓ Stable | X **Unstable** | 17.8° X | 15.3° X | 28.49 N·m X | Medium |
+| **ActuatorNet V3** | ~0.06 m/s | ✓ Stable | ✓ **Stable** | **2.8°** ✓ | 5.1° | 13.34 N·m | Medium |
+| **PD + Residual** | 0.043 m/s | ✓ Stable | ✓ Stable | 4.6° | 5.4° | 14.59 N·m | Medium |
+| **DR Policy** | 0.072 m/s | ✓ Stable | ✓ Stable | **3.9°** | **3.5°** | **13.23 N·m** | High |
 
 **Key Improvement V2 → V3:**
 - S2 Turn: Pitch **17.8° → 2.8°** (84% reduction)
 - S2 Turn: Torque **28.49 → 13.34 N·m** (53% reduction)
 - S2 Turn: Status **Unstable → Stable**
 
-**Recommendations:**
-- **For best tracking accuracy:** PD + Residual Learning
-- **For best stability/robustness:** RMA Policy  
-- **For ActuatorNet users:** Use V3 (Hwangbo-style excitation), avoid V2 for transient scenarios
-- **Avoid:** ActuatorNet V1 (normal data only) for any sim-to-sim transfer
+**Overall Best Performance:**
+- **Best tracking accuracy:** PD + Residual Learning (0.043 m/s baseline error)
+- **Best stability/robustness:** DR-trained Policy (lowest pitch 3.9°, roll 3.5°, torque 13.23 N·m)
+- **Best specialized pitch control:** ActuatorNet V3 (2.8° in S2, when systematic data available)
+- **Most reliable for production:** DR-trained Policy (stable across all scenarios)
 
+**Recommendations:**
+- **For best overall robustness:** DR-trained Policy
+- **For fastest response:** PD + Residual Learning
+- **For specialized pitch control:** ActuatorNet V3 (when systematic data available)
+- **Avoid:** ActuatorNet V1/V2 without proper excitation data
+- **Avoid:** Simple torque clipping (does not prevent falls)
 ---
 
 ## Usage
@@ -1198,7 +1433,7 @@ python -c "import mujoco; print('MuJoCo OK')"
 # Standard policy
 python legged_gym/scripts/train.py --task=go2 --headless --max_iterations=5000
 
-# RMA policy (with domain randomization)
+# DR-trained policy (with domain randomization)
 python legged_gym/scripts/train.py --task=go2_rma --headless --max_iterations=5000
 ```
 
@@ -1227,8 +1462,40 @@ python deploy/deploy_mujoco/deploy_mujoco_go2_logging.py go2.yaml --duration 10
 # Command switching scenarios
 python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py go2.yaml --scenario S2_turn
 
-# Observation delay test
+# Observation delay test (Stage 3)
 python deploy/deploy_mujoco/deploy_mujoco_go2_delay.py go2.yaml --scenario S2_turn --delay 1
+
+# Motor command delay test (Stage 3.5)
+python deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay 1
+```
+
+### Parameter Ablation (Stage 1.5)
+
+```bash
+# Kp sweep
+for kp in go2_kp_low go2 go2_kp_high go2_kp_40; do
+    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kp}.yaml --scenario S2_turn --no_viewer
+done
+
+# Kd sweep
+for kd in go2_kd_03 go2 go2_kd_08 go2_kd_10; do
+    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kd}.yaml --scenario S2_turn --no_viewer
+done
+
+# Mass perturbation
+for mass in go2_mass_m1 go2 go2_mass_p1 go2_mass_p2; do
+    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${mass}.yaml --scenario S2_turn --no_viewer
+done
+
+# Joint friction sweep
+for jf in go2_jfric_none go2 go2_jfric_high; do
+    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${jf}.yaml --scenario S2_turn --no_viewer
+done
+
+# Motor command delay sweep (Stage 3.5)
+for delay in 0 1 2; do
+    python deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay ${delay} --no_viewer
+done
 ```
 
 ### Mismatch Reduction Controllers
@@ -1236,9 +1503,10 @@ python deploy/deploy_mujoco/deploy_mujoco_go2_delay.py go2.yaml --scenario S2_tu
 ```bash
 # PD + Residual Learning
 python deploy/deploy_mujoco/deploy_mujoco_go2_residual.py go2.yaml --duration 10 --cmd 0.5 0.0 0.0
+python deploy_residual_cmd_switch.py --scenario S2_turn
 
-# RMA Policy
-python deploy/deploy_mujoco/deploy_rma_cmd_switch.py go2_rma.yaml
+# DR-trained Policy
+python deploy/deploy_mujoco/deploy_rma_cmd_switch.py --scenario S2_turn
 
 # ActuatorNet V3 transient analysis (S1/S2/S3)
 python deploy/deploy_mujoco/deploy_transient_actuator_net_v3.py S2 --headless
@@ -1273,8 +1541,8 @@ unitree_rl_gym/
 ├── legged_gym/
 │   ├── envs/go2/
 │   │   ├── go2_config.py                              # Base Go2 configuration
-│   │   ├── go2_rma_config.py                          # RMA config (domain randomization)
-│   │   └── go2_rma_env.py                             # RMA env (privileged observations)
+│   │   ├── go2_rma_config.py                          # DR-trained config (domain randomization)
+│   │   └── go2_rma_env.py                             # DR-trained env (privileged observations)
 │   │
 │   └── scripts/
 │       ├── train.py                                   # Policy training
@@ -1289,15 +1557,19 @@ unitree_rl_gym/
 │
 ├── deploy/deploy_mujoco/
 │   ├── configs/
-│   │   ├── go2.yaml                                   # Base MuJoCo config
-│   │   ├── go2_rma.yaml                               # RMA policy config
-│   │   ├── go2_kp_*.yaml                              # Kp ablation configs
+│   │   ├── go2.yaml                                   # Base MuJoCo config (Kp=20, Kd=0.5)
+│   │   ├── go2_rma.yaml                               # DR-trained policy config
+│   │   ├── go2_kp_*.yaml                              # Kp ablation configs (10, 30, 40)
+│   │   ├── go2_kd_*.yaml                              # Kd ablation configs (0.3, 0.8, 1.0)
+│   │   ├── go2_mass_*.yaml                            # Mass ablation configs (-1kg, +1kg, +2kg)
+│   │   ├── go2_jfric_*.yaml                           # Joint friction ablation configs (none, high)
 │   │   └── go2_foot_*.yaml                            # Foot friction ablation configs
 │   │
 │   ├── deploy_mujoco_go2.py                           # Basic deployment
 │   ├── deploy_mujoco_go2_logging.py                   # With metric logging
 │   ├── deploy_mujoco_go2_cmd_switch.py                # Command switching
-│   ├── deploy_mujoco_go2_delay.py                     # Observation delay test
+│   ├── deploy_mujoco_go2_delay.py                     # Observation delay test (Stage 3)
+│   ├── deploy_mujoco_go2_motor_delay.py               # Motor command delay test (Stage 3.5)
 │   ├── deploy_mujoco_go2_residual.py                  # PD + Residual Learning
 │   ├── deploy_mujoco_go2_clipping.py                  # Explicit torque clipping
 │   ├── deploy_mujoco_go2_actuator_net.py              # ActuatorNet V1
@@ -1305,21 +1577,36 @@ unitree_rl_gym/
 │   ├── deploy_transient_actuator_net_v2.py            # ActuatorNet V2 transient
 │   ├── deploy_transient_actuator_net_v3.py            # ActuatorNet V3 transient
 │   ├── deploy_transient_analysis.py                   # General transient metrics
-│   ├── deploy_rma_cmd_switch.py                       # RMA command switching
+│   ├── deploy_rma_cmd_switch.py                       # DR-trained command switching
 │   └── sanity_check_*.py                              # Validation scripts
 │
 ├── unitree_mujoco/unitree_robots/go2/
-│   ├── scene_flat.xml                                 # Flat terrain
+│   ├── go2.xml                                        # Base Go2 robot model
+│   ├── scene_flat.xml                                 # Flat terrain (baseline)
 │   ├── scene_foot_02.xml                              # μ_foot = 0.2
-│   └── scene_foot_08.xml                              # μ_foot = 0.8
+│   ├── scene_foot_08.xml                              # μ_foot = 0.8
+│   ├── scene_mass_m1.xml                              # Scene with base mass -1 kg
+│   ├── scene_mass_p1.xml                              # Scene with base mass +1 kg
+│   ├── scene_mass_p2.xml                              # Scene with base mass +2 kg
+│   ├── scene_jfric_none.xml                           # Scene with no joint friction
+│   ├── scene_jfric_high.xml                           # Scene with high joint friction
+│   └── variants/
+│       ├── go2_mass_m1.xml                            # Go2 with base mass 5.921 kg (-1 kg)
+│       ├── go2_mass_p1.xml                            # Go2 with base mass 7.921 kg (+1 kg)
+│       ├── go2_mass_p2.xml                            # Go2 with base mass 8.921 kg (+2 kg)
+│       ├── go2_jfric_none.xml                         # Go2 with damping=0, frictionloss=0
+│       └── go2_jfric_high.xml                         # Go2 with damping=0.3, frictionloss=0.5
 │
 ├── scripts/
 │   └── plot_results.py                                # Generate comparison plots
 │
 ├── logs/
 │   ├── rough_go2/Jan30_23-48-03_/model_5000.pt       # Trained standard policy
-│   ├── go2_rma/Jan31_20-18-52_/model_5000.pt         # Trained RMA policy
+│   ├── go2_rma/Jan31_20-18-52_/model_5000.pt         # Trained DR policy
 │   ├── sim2sim/                                       # Baseline & ablation logs
+│   │   ├── cmd_switch/                                # Command switching logs
+│   │   ├── delay/                                     # Observation delay logs
+│   │   └── motor_delay/                               # Motor command delay logs
 │   ├── transient_analysis/                            # Transient response logs
 │   ├── residual_net.pt                                # Trained residual model
 │   ├── residual_scaler.pkl                            # Residual feature scaler
@@ -1348,16 +1635,17 @@ unitree_rl_gym/
 |-------------|------|
 | Original trained model | `logs/rough_go2/Jan30_23-48-03_/model_5000.pt` |
 | Original exported policy | `logs/rough_go2/exported/policies/policy_1.pt` |
-| RMA trained model | `logs/go2_rma/Jan31_20-18-52_/model_5000.pt` |
-| RMA exported policy | `logs/go2_rma/exported/policies/policy_1.pt` |
+| DR trained model | `logs/go2_rma/Jan31_20-18-52_/model_5000.pt` |
+| DR exported policy | `logs/go2_rma/exported/policies/policy_1.pt` |
 | MuJoCo Go2 model | `unitree_mujoco/unitree_robots/go2/scene_flat.xml` |
+| MuJoCo Go2 variants | `unitree_mujoco/unitree_robots/go2/variants/` |
 | Residual network | `logs/residual_net.pt` |
 | Residual scaler | `logs/residual_scaler.pkl` |
 | Baseline logs | `logs/sim2sim/` |
 | Command switch logs | `logs/sim2sim/cmd_switch/` |
-| Delay logs | `logs/sim2sim/delay/` |
+| Observation delay logs | `logs/sim2sim/delay/` |
+| Motor command delay logs | `logs/sim2sim/motor_delay/` |
 | Plots | `plots/` |
-
 ---
 
 ## Experimental Pipeline
@@ -1395,7 +1683,7 @@ unitree_rl_gym/
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │              BONUS: MISMATCH REDUCTION                          │
-│  ActuatorNet V1→V2→V3 · Residual Learning · RMA Policy          │
+│  ActuatorNet V1→V2→V3 · Residual Learning · DR-trained Policy          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 ---
