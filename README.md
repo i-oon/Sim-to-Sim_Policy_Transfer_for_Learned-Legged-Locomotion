@@ -1380,13 +1380,7 @@ This concept draws direct inspiration from Phase 1 (Base Policy Training) of Kum
 
 **1. Clone repositories:**
 ```bash
-git clone https://github.com/
-
-# MuJoCo robot models
-git clone https://github.com/unitreerobotics/unitree_mujoco.git
-
-# ActuatorNet
-git clone https://github.com/sunzhon/actuator_net.git
+git clone https://github.com/i-oon/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion.git
 ```
 
 **2. Create conda environment:**
