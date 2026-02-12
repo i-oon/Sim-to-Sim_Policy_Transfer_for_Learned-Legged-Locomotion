@@ -1203,38 +1203,133 @@ Residual learning captures **both** torque clipping AND velocity-dependent compe
 **1. Clone repository:**
 ```bash
 git clone https://github.com/i-oon/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion.git
+cd Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion
 ```
 
-**2. Create conda environment:**
+**2. Download Isaac Gym:**
+
+⚠️ **IMPORTANT**: Isaac Gym is **NOT included** in this repository due to NVIDIA's license. You must download it separately.
+
+**Step 2.1: Download from NVIDIA**
+1. Go to: https://developer.nvidia.com/isaac-gym
+2. Sign up / Log in with NVIDIA Developer account (free)
+3. Download **Isaac Gym Preview 4** (file: IsaacGym_Preview_4_Package.tar.gz)
+
+**Step 2.2: Extract and place in project**
+```bash
+# Go to your Downloads folder (adjust path if needed)
+cd ~/Downloads
+
+# Extract the archive (This creates a folder called 'isaacgym')
+tar -xf IsaacGym_Preview_4_Package.tar.gz
+
+# Move it into the unitree_rl_gym directory
+mv isaacgym ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/
+
+# Verify it's in the right place
+ls ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/isaacgym/
+# Expected output: docs  python  LICENSE  README.md  ...
+```
+
+**Alternative: If you already have Isaac Gym installed elsewhere**
+```bash
+# Create a symbolic link instead of copying
+cd ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/
+ln -s /path/to/your/existing/isaacgym isaacgym
+```
+
+**3. Create conda environment:**
 ```bash
 conda create -n unitree_rl python=3.8 -y
 conda activate unitree_rl
 ```
 
-**3. Install dependencies:**
+
+**4. Install dependencies:**
 ```bash
 cd ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym
 
-# Isaac Gym (download from NVIDIA)
+# Step 4.1: Verify Isaac Gym is in place
+ls -la isaacgym/
+# If missing, go back to step 2
+
+# Step 4.2: Install Isaac Gym FIRST (before anything else)
 pip install -e isaacgym/python
 
-# Core packages
-pip install torch torchvision
+# Step 4.3: Install PyTorch (check CUDA version: nvidia-smi)
+# For CUDA 11.8:
+pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118
+# For CUDA 12.1:
+# pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu121
+
+# Step 4.4: Install MuJoCo and visualization
 pip install mujoco mujoco-viewer
-pip install numpy scipy matplotlib pyyaml
 
-# RL training
+# Step 4.5: Install RL and environment packages
+pip install gymnasium
+pip install tensorboard
+
+# Step 4.6: Install data processing and ML packages
+pip install numpy scipy pandas
+pip install scikit-learn
+pip install matplotlib seaborn
+pip install pillow
+pip install typeguard  # Fix for generate-parameter-library-py warning
+
+# Step 4.7: Install utilities
+pip install pyyaml tqdm
+
+# Step 4.8: Install unitree_rl_gym package (NOW that isaacgym is installed)
 pip install -e .
 
-# ActuatorNet
+# Step 4.9: Install ActuatorNet dependencies
 cd ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/actuator_net
-pip install -e .
+pip install -r requirements.txt
 ```
 
-**4. Verify setup:**
+**Common Isaac Gym installation issues:**
 ```bash
-python -c "from isaacgym import gymapi; print('Isaac Gym OK')"
-python -c "import mujoco; print('MuJoCo OK')"
+# If "isaacgym/python is not a valid editable requirement":
+# → You forgot to download Isaac Gym (step 2)
+
+# If "vulkan/X11 errors":
+pip install -e isaacgym/python --no-cache-dir
+
+# If "OpenGL errors":
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco210/bin
+```
+
+**Optional (for development):**
+```bash
+pip install jupyter ipython
+pip install black flake8  # code formatting
+```
+
+**5. Verify setup:**
+```bash
+# Core dependencies
+python -c "from isaacgym import gymapi; print('✓ Isaac Gym OK')"
+python -c "import mujoco; print('✓ MuJoCo OK')"
+python -c "import torch; print('✓ PyTorch', torch.__version__, 'CUDA:', torch.cuda.is_available())"
+
+# ML packages
+python -c "import numpy, scipy, pandas, sklearn; print('✓ Data packages OK')"
+python -c "import matplotlib, seaborn; print('✓ Plotting packages OK')"
+
+# RL packages
+python -c "import gymnasium; print('✓ Gymnasium OK')"
+
+# Check CUDA availability (important for PPO training)
+python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available!'; print('✓ CUDA available on', torch.cuda.get_device_name(0))"
+```
+
+**If CUDA errors occur:**
+```bash
+# Check CUDA version
+nvidia-smi
+
+# Reinstall PyTorch with matching CUDA version
+# See: https://pytorch.org/get-started/locally/
 ```
 
 ### Training
@@ -1334,6 +1429,7 @@ python legged_gym/scripts/train_residual_net.py
 
 ```bash
 python scripts/plot_results.py
+python scripts/plot_transient_analysis.py
 ```
 
 ---
