@@ -1291,28 +1291,28 @@ python legged_gym/scripts/train.py --task=go2_rma --headless --max_iterations=50
 ### Isaac Gym Evaluation
 
 ```bash
-python legged_gym/scripts/play.py --task=go2 --num_envs=1
-python legged_gym/scripts/play_logging.py --task=go2
-python legged_gym/scripts/play_cmd_switch.py --task=go2 --scenario S2_turn
+python unitree_rl_gym/legged_gym/scripts/play.py --task=go2 --num_envs=1
+python unitree_rl_gym/legged_gym/scripts/play_logging.py --task=go2
+python unitree_rl_gym/legged_gym/scripts/play_cmd_switch.py --task=go2 --scenario S2_turn
 ```
 
 ### MuJoCo Deployment
 
 ```bash
 # Basic deployment
-python deploy/deploy_mujoco/deploy_mujoco_go2.py go2.yaml
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2.py go2.yaml
 
 # With metric logging
-python deploy/deploy_mujoco/deploy_mujoco_go2_logging.py go2.yaml --duration 10
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_logging.py go2.yaml --duration 10
 
 # Command switching scenarios
-python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py go2.yaml --scenario S2_turn
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py go2.yaml --scenario S2_turn
 
 # Observation delay test (Stage 3)
-python deploy/deploy_mujoco/deploy_mujoco_go2_delay.py go2.yaml --scenario S2_turn --delay 1
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_delay.py go2.yaml --scenario S2_turn --delay 1
 
 # Motor command delay test (Stage 3.5)
-python deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay 1
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay 1
 ```
 
 ### Parameter Ablation (Stage 1.5)
@@ -1320,27 +1320,27 @@ python deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario
 ```bash
 # Kp sweep
 for kp in go2_kp_low go2 go2_kp_high go2_kp_40; do
-    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kp}.yaml --scenario S2_turn --no_viewer
+    python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kp}.yaml --scenario S2_turn --no_viewer
 done
 
 # Kd sweep
 for kd in go2_kd_03 go2 go2_kd_08 go2_kd_10; do
-    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kd}.yaml --scenario S2_turn --no_viewer
+    python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${kd}.yaml --scenario S2_turn --no_viewer
 done
 
 # Mass perturbation
 for mass in go2_mass_m1 go2 go2_mass_p1 go2_mass_p2; do
-    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${mass}.yaml --scenario S2_turn --no_viewer
+    python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${mass}.yaml --scenario S2_turn --no_viewer
 done
 
 # Joint friction sweep
 for jf in go2_jfric_none go2 go2_jfric_high; do
-    python deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${jf}.yaml --scenario S2_turn --no_viewer
+    python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_cmd_switch.py ${jf}.yaml --scenario S2_turn --no_viewer
 done
 
 # Motor command delay sweep (Stage 3.5)
 for delay in 0 1 2; do
-    python deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay ${delay} --no_viewer
+    python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_motor_delay.py go2.yaml --scenario S2_turn --motor_delay ${delay} --no_viewer
 done
 ```
 
@@ -1348,34 +1348,34 @@ done
 
 ```bash
 # PD + Residual Learning
-python deploy/deploy_mujoco/deploy_mujoco_go2_residual.py go2.yaml --duration 10 --cmd 0.5 0.0 0.0
-python deploy/deploy_mujoco/deploy_residual_cmd_switch.py --scenario S2_turn
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_mujoco_go2_residual.py go2.yaml --duration 10 --cmd 0.5 0.0 0.0
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_residual_cmd_switch.py --scenario S2_turn
 
 # DR-trained Policy
-python deploy/deploy_mujoco/deploy_rma_cmd_switch.py --scenario S2_turn
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_rma_cmd_switch.py --scenario S2_turn
 
 # ActuatorNet V3 transient analysis
-python deploy/deploy_mujoco/deploy_transient_actuator_net_v3.py S2 --headless
+python unitree_rl_gym/deploy/deploy_mujoco/deploy_transient_actuator_net_v3.py S2 --headless
 ```
 
 ### Data Collection and Training (Bonus)
 
 ```bash
 # Hwangbo-style excitation data
-python legged_gym/scripts/collect_hwangbo_excitation.py --task=go2
+python unitree_rl_gym/legged_gym/scripts/collect_hwangbo_excitation.py --task=go2
 
 # Residual data
-python legged_gym/scripts/collect_residual_data.py --task=go2
+python unitree_rl_gym/legged_gym/scripts/collect_residual_data.py --task=go2
 
 # Train residual network
-python legged_gym/scripts/train_residual_net.py
+python unitree_rl_gym/legged_gym/scripts/train_residual_net.py
 ```
 
 ### Generate Plots
 
 ```bash
-python scripts/plot_results.py
-python scripts/plot_transient_analysis.py
+python unitree_rl_gym/legged_gym/scripts/plot_results.py
+python unitree_rl_gym/legged_gym/scripts/plot_transient_analysis.py
 ```
 
 ---
