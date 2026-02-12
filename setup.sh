@@ -182,3 +182,4 @@ else
 fi
 
 echo -e "${BLUE}========================================================${NC}"
+conda activate unitree_rl
