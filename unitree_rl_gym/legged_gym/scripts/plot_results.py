@@ -8,8 +8,8 @@ plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams['figure.figsize'] = (10, 6)
 plt.rcParams['font.size'] = 12
 
-LOG_DIR = "~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/logs/sim2sim"
-PLOT_DIR = "~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/plots"
+LOG_DIR = "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/logs/sim2sim"
+PLOT_DIR = "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/plots"
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 def load_latest_log(pattern):

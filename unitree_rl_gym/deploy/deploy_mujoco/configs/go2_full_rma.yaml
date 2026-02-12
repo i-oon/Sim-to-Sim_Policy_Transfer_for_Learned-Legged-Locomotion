@@ -1,4 +1,4 @@
-xml_path: "~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_mujoco/unitree_robots/go2/scene_flat.xml"
+xml_path: "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_mujoco/unitree_robots/go2/scene_flat.xml"
 simulation_dt: 0.005
 control_decimation: 4
 action_scale: 0.25
