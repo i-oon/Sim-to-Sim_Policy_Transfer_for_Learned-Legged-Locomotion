@@ -1249,6 +1249,14 @@ chmod +x setup.sh
 # Run the setup (This will create a 'unitree_rl' conda env)
 ./setup.sh
 ```
+Regarding Dependency Conflicts:
+During installation, you may encounter ERROR: pip's dependency resolver... regarding numpy version conflicts with gymnasium or pandas. **This is expected and safe to ignore.** 
+The project specifically pins certain library versions to maintain compatibility with the Isaac Gym binaries (Python 3.8).
+As long as the Sanity Check at the end of the script displays the following, the environment is fully functional:
+- ✓ PyTorch 2.4.1+cu121 (CUDA: True)
+- ✓ Isaac Gym OK
+- ✓ MuJoCo 3.2.3 OK
+
 
 **4. Verification:**
 ```bash
@@ -1523,5 +1531,6 @@ unitree_rl_gym/
 ---
 
 ## Author
+
 
 Disthorn Suttawet | FIBO, KMUTT | January 2026
