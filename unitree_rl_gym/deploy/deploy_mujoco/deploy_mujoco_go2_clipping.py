@@ -10,8 +10,6 @@ import os
 import time
 import argparse
 
-LEGGED_GYM_ROOT_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym")
-
 def quat_rotate_inverse(q, v):
     q_w, q_x, q_y, q_z = q
     q_conj = np.array([q_w, -q_x, -q_y, -q_z])
@@ -27,14 +25,30 @@ def get_gravity_orientation(quat):
     return grav
 
 def run_test(config_file, use_clipping=True, torque_limit=30.0, duration=10.0, cmd=[0.5, 0.0, 0.0]):
+    # Dynamic Path Resolution
+    CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+    LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(CURRENT_FILE_DIR))
+    PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
     config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco/configs", config_file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     
-    policy = torch.jit.load(config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR))
+    policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+    xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+
+    # Fix for parallel unitree_mujoco folder
+    if "unitree_mujoco" in xml_path:
+        xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+    
+    # Clean hardcoded paths
+    if "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/" in policy_path:
+        policy_path = policy_path.replace("/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/", PROJECT_ROOT + "/")
+
+    policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    m = mujoco.MjModel.from_xml_path(xml_path)
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

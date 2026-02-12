@@ -1340,7 +1340,7 @@ done
 ```bash
 # PD + Residual Learning
 python deploy/deploy_mujoco/deploy_mujoco_go2_residual.py go2.yaml --duration 10 --cmd 0.5 0.0 0.0
-python deploy_residual_cmd_switch.py --scenario S2_turn
+python deploy/deploy_mujoco/deploy_residual_cmd_switch.py --scenario S2_turn
 
 # DR-trained Policy
 python deploy/deploy_mujoco/deploy_rma_cmd_switch.py --scenario S2_turn

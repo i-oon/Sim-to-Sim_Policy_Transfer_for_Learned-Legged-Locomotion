@@ -34,16 +34,30 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     import argparse
+    import os
+
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", type=str)
     parser.add_argument("--log_dir", type=str, default="logs/sim2sim")
     parser.add_argument("--duration", type=float, default=10.0)
     args = parser.parse_args()
+
+    LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
+    config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco/configs", args.config_file)
     
-    with open(f"{LEGGED_GYM_ROOT_DIR}/deploy/deploy_mujoco/configs/{args.config_file}", "r") as f:
+    with open(config_path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+        
         policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
         xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+
+        if "unitree_mujoco" in xml_path:
+            xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+        
+        if "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/" in policy_path:
+            policy_path = policy_path.replace("/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/", PROJECT_ROOT + "/")
         simulation_dt = config["simulation_dt"]
         control_decimation = config["control_decimation"]
         kps = np.array(config["kps"], dtype=np.float32)

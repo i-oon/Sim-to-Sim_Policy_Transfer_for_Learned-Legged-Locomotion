@@ -77,13 +77,22 @@ class PDController:
         return tau, tau, np.zeros(12)
 
 def run_deployment(config_file, use_residual=True, duration=10.0, cmd=[0.5, 0.0, 0.0]):
+    LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
     config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco/configs", config_file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     
     policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
-    xml_path = config["xml_path"]
+    xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
     
+    if "unitree_mujoco" in xml_path:
+        xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+    
+    if "unitree_mujoco" in policy_path:
+        policy_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", policy_path.split("unitree_mujoco/")[-1])
+        
     policy = torch.jit.load(policy_path)
     policy.eval()
     

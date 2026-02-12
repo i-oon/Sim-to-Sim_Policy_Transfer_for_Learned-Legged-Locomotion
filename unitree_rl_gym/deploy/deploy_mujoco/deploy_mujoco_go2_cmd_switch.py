@@ -56,6 +56,9 @@ SCENARIOS = {
 }
 
 if __name__ == "__main__":
+    import argparse
+    import os
+
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", type=str)
     parser.add_argument("--scenario", type=str, default="S1_stop", choices=SCENARIOS.keys())
@@ -65,19 +68,27 @@ if __name__ == "__main__":
     parser.add_argument("--no_viewer", action="store_true")
     args = parser.parse_args()
     
+    LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
     scenario = SCENARIOS[args.scenario]
     cmd_before = np.array(scenario['cmd_before'], dtype=np.float32)
     cmd_after = np.array(scenario['cmd_after'], dtype=np.float32)
     switch_time = args.switch_time
     
-    print(f"=== Command Switching: {scenario['name']} ===")
-    print(f"Before t={switch_time}s: cmd = {cmd_before}")
-    print(f"After  t={switch_time}s: cmd = {cmd_after}")
+    config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco/configs", args.config_file)
     
-    with open(f"{LEGGED_GYM_ROOT_DIR}/deploy/deploy_mujoco/configs/{args.config_file}", "r") as f:
+    with open(config_path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+        
         policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
         xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+
+        if "unitree_mujoco" in xml_path:
+            xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+        
+        if "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/" in policy_path:
+            policy_path = policy_path.replace("/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/", PROJECT_ROOT + "/")
         simulation_dt = config["simulation_dt"]
         control_decimation = config["control_decimation"]
         kps = np.array(config["kps"], dtype=np.float32)

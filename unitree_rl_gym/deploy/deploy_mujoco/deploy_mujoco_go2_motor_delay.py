@@ -69,10 +69,34 @@ if __name__ == "__main__":
     print(f"Before t={switch_time}s: cmd = {cmd_before}")
     print(f"After  t={switch_time}s: cmd = {cmd_after}")
     
-    with open(f"{LEGGED_GYM_ROOT_DIR}/deploy/deploy_mujoco/configs/{args.config_file}", "r") as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-        policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
-        xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+    if __name__ == "__main__":
+    # ... (parser setup same as before)
+        args = parser.parse_args()
+
+        # Fixed Path Logic
+        CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__)) # deploy/deploy_mujoco
+        # LEGGED_GYM_ROOT_DIR should be ~/Sim-to-Sim_.../unitree_rl_gym
+        LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(CURRENT_FILE_DIR))
+        # PROJECT_ROOT should be ~/Sim-to-Sim_...
+        PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
+        config_path = os.path.join(CURRENT_FILE_DIR, "configs", args.config_file)
+        
+        with open(config_path, "r") as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+            
+            policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+            xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+            
+            # This handles the parallel folder structure correctly
+            if "unitree_mujoco" in xml_path:
+                xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+            
+            # Clean up any leftover hardcoded drl-68 paths in the policy string
+            if "/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/" in policy_path:
+                policy_path = policy_path.replace("/home/drl-68/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/", PROJECT_ROOT + "/")
+
+            # ... (rest of the variable assignments)
         simulation_dt = config["simulation_dt"]
         control_decimation = config["control_decimation"]
         kps = np.array(config["kps"], dtype=np.float32)

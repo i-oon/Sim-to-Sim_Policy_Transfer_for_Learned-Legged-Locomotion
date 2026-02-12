@@ -22,14 +22,30 @@ def pd_control(target_q, q, kp, target_dq, dq, kd):
 
 if __name__ == "__main__":
     import argparse
+    import os
+
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", type=str, help="config file name")
     args = parser.parse_args()
+
+    LEGGED_GYM_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    PROJECT_ROOT = os.path.dirname(LEGGED_GYM_ROOT_DIR)
+
+    config_path = os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco/configs", args.config_file)
     
-    with open(f"{LEGGED_GYM_ROOT_DIR}/deploy/deploy_mujoco/configs/{args.config_file}", "r") as f:
+    with open(config_path, "r") as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+        
         policy_path = config["policy_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
         xml_path = config["xml_path"].replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+        
+        # Fixed path resolution to handle parallel directory structure
+        if "unitree_mujoco" in xml_path:
+            xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_path.split("unitree_mujoco/")[-1])
+        
+        if "unitree_mujoco" in policy_path:
+            policy_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", policy_path.split("unitree_mujoco/")[-1])
+
         simulation_duration = config["simulation_duration"]
         simulation_dt = config["simulation_dt"]
         control_decimation = config["control_decimation"]
@@ -44,7 +60,7 @@ if __name__ == "__main__":
         num_actions = config["num_actions"]
         num_obs = config["num_obs"]
         cmd = np.array(config["cmd_init"], dtype=np.float32)
-        lin_vel_scale = 2.0  # from obs_scales.lin_vel
+        lin_vel_scale = 2.0
 
     action = np.zeros(num_actions, dtype=np.float32)
     target_dof_pos = default_angles.copy()

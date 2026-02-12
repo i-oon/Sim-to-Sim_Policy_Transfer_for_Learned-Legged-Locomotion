@@ -12,8 +12,12 @@ import pickle
 import time
 import argparse
 
-LEGGED_GYM_ROOT_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym")
-ACTUATOR_NET_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/actuator_net/app/resources")
+CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_FILE_DIR, "../../../"))
+
+# 3. กำหนดตัวแปรโดยไม่อิงกับชื่อ User ในเครื่อง (~/ หรือ /home/drl-68/)
+LEGGED_GYM_ROOT_DIR = os.path.join(PROJECT_ROOT, "unitree_rl_gym")
+ACTUATOR_NET_DIR = os.path.join(PROJECT_ROOT, "actuator_net/app/resources")
 
 def quat_rotate_inverse(q, v):
     q_w, q_x, q_y, q_z = q

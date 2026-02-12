@@ -7,7 +7,10 @@ import subprocess
 import numpy as np
 from datetime import datetime
 
-LEGGED_GYM_ROOT_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym")
+CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_FILE_DIR, "../../../"))
+LEGGED_GYM_ROOT_DIR = os.path.join(PROJECT_ROOT, "unitree_rl_gym")
+
 sys.path.append(os.path.join(LEGGED_GYM_ROOT_DIR, "deploy/deploy_mujoco"))
 
 SCENARIOS = ['S1_stop', 'S2_turn', 'S3_lateral']

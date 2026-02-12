@@ -12,8 +12,10 @@ import time
 import json
 import pickle
 
-LEGGED_GYM_ROOT_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym")
-ACTUATOR_NET_DIR = os.path.expanduser("~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/actuator_net/app/resources")
+CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_FILE_DIR, "../../../"))
+LEGGED_GYM_ROOT_DIR = os.path.join(PROJECT_ROOT, "unitree_rl_gym")
+ACTUATOR_NET_DIR = os.path.join(PROJECT_ROOT, "actuator_net/app/resources")
 
 class ActuatorNetV3Controller:
     """ActuatorNet V3 with 6-feature input and history buffer"""
