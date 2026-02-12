@@ -75,7 +75,7 @@ def run_test(config_file, use_actuator_net=True, duration=10.0, cmd=[0.5, 0.0, 0
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(config["xml_path"]))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

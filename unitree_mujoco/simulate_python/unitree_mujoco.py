@@ -12,7 +12,7 @@ import config
 
 locker = threading.Lock()
 
-mj_model = mujoco.MjModel.from_xml_path(config.ROBOT_SCENE)
+mj_model = mujoco.MjModel.from_xml_path(os.path.expanduser(config.ROBOT_SCENE))
 mj_data = mujoco.MjData(mj_model)
 
 

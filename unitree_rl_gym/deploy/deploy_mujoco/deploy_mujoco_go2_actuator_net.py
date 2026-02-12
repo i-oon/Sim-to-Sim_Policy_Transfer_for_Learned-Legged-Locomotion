@@ -115,7 +115,7 @@ def run_deployment(config_file, use_actuator_net=True, duration=10.0, cmd=[0.5, 
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(xml_path)
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(xml_path))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

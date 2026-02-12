@@ -180,7 +180,7 @@ def run_transient_test(scenario='S2', duration=6.0, headless=False):
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(config["xml_path"]))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

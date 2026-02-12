@@ -62,7 +62,7 @@ def run_cmd_switch(use_actuator_net=True, duration=6.0):
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(config["xml_path"]))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

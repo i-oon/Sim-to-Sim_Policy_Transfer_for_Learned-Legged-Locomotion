@@ -68,7 +68,7 @@ if __name__ == "__main__":
     counter = 0
 
     # Load robot model
-    m = mujoco.MjModel.from_xml_path(xml_path)
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(xml_path))
     d = mujoco.MjData(m)
     m.opt.timestep = simulation_dt
 

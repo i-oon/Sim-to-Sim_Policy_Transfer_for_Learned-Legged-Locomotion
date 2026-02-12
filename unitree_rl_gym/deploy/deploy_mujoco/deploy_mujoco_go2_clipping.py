@@ -48,7 +48,7 @@ def run_test(config_file, use_clipping=True, torque_limit=30.0, duration=10.0, c
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(xml_path)
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(xml_path))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

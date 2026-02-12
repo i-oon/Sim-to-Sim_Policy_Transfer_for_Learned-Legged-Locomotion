@@ -65,7 +65,7 @@ def run_cmd_switch(config_name, scenario_key='S2_turn', duration=6.0, switch_tim
     policy = torch.jit.load(policy_path)
     policy.eval()
     
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    m = mujoco.MjModel.from_xml_path(os.path.expanduser(config["xml_path"]))
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     

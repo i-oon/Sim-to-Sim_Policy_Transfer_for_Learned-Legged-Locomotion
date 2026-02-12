@@ -63,7 +63,14 @@ def run_cmd_switch(scenario_key='S2_turn', use_residual=True, duration=6.0, swit
     policy.eval()
     
     # Setup Mujoco
-    m = mujoco.MjModel.from_xml_path(config["xml_path"])
+    raw_xml_path = config["xml_path"]
+    if "unitree_mujoco" in raw_xml_path:
+        xml_relative_path = raw_xml_path.split("unitree_mujoco/")[-1]
+        actual_xml_path = os.path.join(PROJECT_ROOT, "unitree_mujoco", xml_relative_path)
+    else:
+        actual_xml_path = raw_xml_path.replace("{LEGGED_GYM_ROOT_DIR}", LEGGED_GYM_ROOT_DIR)
+
+    m = mujoco.MjModel.from_xml_path(actual_xml_path)
     d = mujoco.MjData(m)
     m.opt.timestep = config["simulation_dt"]
     
