@@ -7,7 +7,6 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 import torch
 import yaml
 
-
 def get_gravity_orientation(quaternion):
     qw = quaternion[0]
     qx = quaternion[1]

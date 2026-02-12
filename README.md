@@ -1226,10 +1226,10 @@ cd ~/Downloads
 tar -xf IsaacGym_Preview_4_Package.tar.gz
 
 # Move it into the unitree_rl_gym directory
-mv isaacgym ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/
+mv isaacgym ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/
 
 # Verify it's in the right place
-ls ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/unitree_rl_gym/isaacgym/
+ls ~/Sim-to-Sim_Policy_Transfer_for_Learned-Legged-Locomotion/isaacgym/
 # Expected output: docs  python  LICENSE  README.md  ...
 ```
 
